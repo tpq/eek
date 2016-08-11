@@ -1,0 +1,18 @@
+Package: eek
+Title: A Tool to Pre-Process Bulk EKG Data and Detect Physiological Peaks
+Version: 0.0.0.9000
+URL: http://github.com/tpq/eek
+BugReports: http://github.com/tpq/eek/issues
+Authors@R: c(
+    person("Thomas", "Quinn", email = "contacttomquinn@gmail.com", role = c("aut", "cre"))
+    )
+Description: This packages introduces a framework for analyzing EKG data.
+License: GPL-2
+LazyData: true
+VignetteBuilder: knitr
+RoxygenNote: 5.0.1
+Depends:
+    R (>= 3.2.2)
+Suggests:
+    knitr,
+    rmarkdown
