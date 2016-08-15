@@ -13,18 +13,28 @@ eek <-
               )
   )
 
-# Methods describe as doc string inside method definition...
-eek$methods(read = function(file){
+eek$methods(initialize = function(file, channel = 1){
 
   # "DESCRIBE METHOD HERE LIKE THIS"
 
-  data <- read.delim(file, skip = 1, header = TRUE, stringsAsFactors = FALSE)
-  colnames(data) <- c("Time", "ECG")
+  # Read ECG file and select i-th channel
+  data <- read.delim(file, skip = 1, header = TRUE,
+                     stringsAsFactors = FALSE)
+  data <- data.frame("Time" = data[, 1], "ECG" = data[, channel + 1],
+                     stringsAsFactors = FALSE)
 
-  minsec <- lapply(strsplit(data$Time, ":"), as.numeric)
-  minsec <- unlist(lapply(minsec, function(x) x[1] * 60 + x[2]))
-  data$Time <- minsec
+  # Convert min:sec time to decimal seconds
+  if(!is.numeric(data$Time)){
 
+    minsec <- lapply(strsplit(data$Time, ":"), as.numeric)
+    minsec <- unlist(lapply(minsec, function(x) x[1] * 60 + x[2]))
+    data$Time <- minsec
+  }
+
+  # Zero-scale decimal seconds
+  data$Time <- data$Time - data$Time[1]
+
+  # Save data in object
   dat <<- data
   window <<- 1:nrow(dat)
 })
@@ -49,6 +59,8 @@ eek$methods(zone = function(l = 65, sd = .25){
   subset <- (1 + offset):(length(dat$Filter) + offset)
   dat$Gaus <<- smoothed[subset]
 
+  ### NOTE TO SELF: BREAK HERE
+
   # Find all of the zero-crossings
   res <- EMD::extrema(dat$Gaus)
   bounds <<- res$cross[, 1]
@@ -70,12 +82,12 @@ eek$methods(getR = function(minheight = .5, maxrate = 300){
     minpeakdistance = peakd
   )
 
-  # Use minimum peak height to calculate quality score
+  # Use minimum peak height as a threshold to calculate a quality score
   peakind <- order(peaks[, 2])
   quality <- vector("numeric", length(peakind))
   quality[1] <- 0 # First quality score always zero
   lastRend <- peaks[peakind[1], 4] # Check quality from first peak onward
-  for(i in 2:length(peakind)){
+  for(i in 2:(length(peakind) - 1)){
 
     # Quality score for range from (i-1)th peak to (i+1)th peak
     nextRstart <- peaks[peakind[i + 1], 3]
@@ -85,6 +97,7 @@ eek$methods(getR = function(minheight = .5, maxrate = 300){
       (nextRstart - lastRend + 1)
     lastRend <- peaks[peakind[i], 4]
   }
+  quality[length(peakind)] <- 0 # Last quality score always zero
 
   final <- data.frame(peaks[peakind, c(3, 2, 4, 1)], quality^4)
   colnames(final) <- c("start", "peak", "end", "height", "quality")
@@ -93,23 +106,33 @@ eek$methods(getR = function(minheight = .5, maxrate = 300){
 
 eek$methods(importance = function(threshold){
 
-  # Find importance zones (area between bounds)
-  startzones <<- vector("numeric")
-  endzones <<- vector("numeric")
-  s <- 1
-  i <- 1
-  for(e in bounds){
+  if(is.null(bounds)) stop("Call eek$zone() before baseline correction.")
+  if(is.null(R)) stop("Call eek$getR() before baseline correction.")
 
-    # First: Make sure zero-crossings flank an extrema
-    if(any(res$minindex[, 1] %in% s:e) | any(res$maxindex[, 1] %in% s:e)){
+  function(){
 
-      startzones[i] <<- s
-      endzones[i] <<- e
-      i <- i + 1
+    # Find importance zones (area between bounds)
+    startzones <<- vector("numeric")
+    endzones <<- vector("numeric")
+    s <- 1
+    i <- 1
+    for(e in bounds){
+
+      # First: Make sure zero-crossings flank an extrema
+      if(any(res$minindex[, 1] %in% s:e) | any(res$maxindex[, 1] %in% s:e)){
+
+        startzones[i] <<- s
+        endzones[i] <<- e
+        i <- i + 1
+      }
+
+      s <- e + 1
     }
-
-    s <- e + 1
   }
+
+
+  # For each (R-R) window:
+  # ...
 })
 
 eek$methods(qplot = function(view){
