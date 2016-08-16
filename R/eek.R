@@ -15,7 +15,7 @@ eek <-
 
 eek$methods(initialize = function(file, channel = 1){
 
-  # "DESCRIBE METHOD HERE LIKE THIS"
+  "Initialize eek object with a single ECG channel."
 
   # Read ECG file and select i-th channel
   data <- read.delim(file, skip = 1, header = TRUE,
@@ -31,21 +31,23 @@ eek$methods(initialize = function(file, channel = 1){
     data$Time <- minsec
   }
 
-  # Zero-scale decimal seconds
+  # Zero-scale time
   data$Time <- data$Time - data$Time[1]
-
-  # Save data in object
+  window <<- 1:nrow(data)
   dat <<- data
-  window <<- 1:nrow(dat)
 })
 
 eek$methods(filter = function(n = 1, lo = 1/40, hi = 1/2){
+
+  "Filter ECG signal using a bandpass filter."
 
   bf <- signal::butter(n, c(lo, hi), type = "pass")
   dat$Filter <<- signal::filtfilt(bf, dat$ECG)
 })
 
-eek$methods(zone = function(l = 65, sd = .25){
+eek$methods(smooth = function(l = 65, sd = .25){
+
+  "Smooth ECG signal convolving with Gaussian window."
 
   if(is.null(dat$Filter)) stop("Call eek$filter() before zoning.")
 
@@ -58,12 +60,6 @@ eek$methods(zone = function(l = 65, sd = .25){
   offset <- (l - 1) / 2
   subset <- (1 + offset):(length(dat$Filter) + offset)
   dat$Gaus <<- smoothed[subset]
-
-  ### NOTE TO SELF: BREAK HERE
-
-  # Find all of the zero-crossings
-  res <- EMD::extrema(dat$Gaus)
-  bounds <<- res$cross[, 1]
 })
 
 eek$methods(getR = function(minheight = .5, maxrate = 300){
@@ -99,6 +95,7 @@ eek$methods(getR = function(minheight = .5, maxrate = 300){
   }
   quality[length(peakind)] <- 0 # Last quality score always zero
 
+  # Document putative R peaks
   final <- data.frame(peaks[peakind, c(3, 2, 4, 1)], quality^4)
   colnames(final) <- c("start", "peak", "end", "height", "quality")
   R <<- final
@@ -106,33 +103,39 @@ eek$methods(getR = function(minheight = .5, maxrate = 300){
 
 eek$methods(importance = function(threshold){
 
-  if(is.null(bounds)) stop("Call eek$zone() before baseline correction.")
-  if(is.null(R)) stop("Call eek$getR() before baseline correction.")
-
-  function(){
-
-    # Find importance zones (area between bounds)
-    startzones <<- vector("numeric")
-    endzones <<- vector("numeric")
-    s <- 1
-    i <- 1
-    for(e in bounds){
-
-      # First: Make sure zero-crossings flank an extrema
-      if(any(res$minindex[, 1] %in% s:e) | any(res$maxindex[, 1] %in% s:e)){
-
-        startzones[i] <<- s
-        endzones[i] <<- e
-        i <- i + 1
-      }
-
-      s <- e + 1
-    }
-  }
-
+  # if(!is.data.frame(R)) stop("Call eek$getR() before baseline correction.")
+  #
+  # function(){
+  #
+  #   # Find importance zones (area between bounds)
+  #   startzones <<- vector("numeric")
+  #   endzones <<- vector("numeric")
+  #   s <- 1
+  #   i <- 1
+  #   for(e in bounds){
+  #
+  #     # First: Make sure zero-crossings flank an extrema
+  #     if(any(res$minindex[, 1] %in% s:e) | any(res$maxindex[, 1] %in% s:e)){
+  #
+  #       startzones[i] <<- s
+  #       endzones[i] <<- e
+  #       i <- i + 1
+  #     }
+  #
+  #     s <- e + 1
+  #   }
+  # }
+  #
+  # if(!is.numeric(bounds)){
+  #
+  #   # Find all of the zero-crossings
+  #   res <- EMD::extrema(dat$Gaus)
+  #   bounds <<- res$cross[, 1]
+  # }
 
   # For each (R-R) window:
-  # ...
+  #  Calculate Importance Zones
+  #  Threshold: x%
 })
 
 eek$methods(qplot = function(view){
@@ -155,26 +158,26 @@ eek$methods(qplot = function(view){
     points(dat$Time[view], dat$Gaus[view], col = "green", type = "l")
   }
 
-  if(is.numeric(bounds)){
-
-    for(mark in bounds[bounds > min(view) & bounds < max(view)]){
-
-      abline(v = dat$Time[mark], col = "pink")
-    }
-  }
-
-  if(is.numeric(startzones) & is.numeric(endzones)){
-
-    range <- startzones >= min(view) & endzones <= max(view)
-    st <- startzones[range]
-    en <- endzones[range]
-    for(i in 1:length(st)){
-
-      polygon(x = c(rep(dat$Time[st[i]], 2),
-                    rep(dat$Time[en[i]], 2)),
-              y = c(-100, 100, 100, -100),
-              col = "pink", angle = 0,
-              density = 5)
-    }
-  }
+  # if(is.numeric(bounds)){
+  #
+  #   for(mark in bounds[bounds > min(view) & bounds < max(view)]){
+  #
+  #     abline(v = dat$Time[mark], col = "pink")
+  #   }
+  # }
+  #
+  # if(is.numeric(startzones) & is.numeric(endzones)){
+  #
+  #   range <- startzones >= min(view) & endzones <= max(view)
+  #   st <- startzones[range]
+  #   en <- endzones[range]
+  #   for(i in 1:length(st)){
+  #
+  #     polygon(x = c(rep(dat$Time[st[i]], 2),
+  #                   rep(dat$Time[en[i]], 2)),
+  #             y = c(-100, 100, 100, -100),
+  #             col = "pink", angle = 0,
+  #             density = 5)
+  #   }
+  # }
 })
