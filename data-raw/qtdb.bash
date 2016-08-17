@@ -21,4 +21,7 @@ do
   # Save first pass PQRST identification
   rdann -r $sample -a qt1 > "/home/thom/Dropbox/R/projects/_lib-eek/eek/data-raw/qtdb/$sample-qt1.txt"
 
+  # Save second PQRST identification
+  rdann -r $sample -a q1c > "/home/thom/Dropbox/R/projects/_lib-eek/eek/data-raw/qtdb/$sample-q1c.txt"
+
 done
