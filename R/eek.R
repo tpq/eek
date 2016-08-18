@@ -9,7 +9,9 @@ eek <-
                 "bounds",
                 "startzones",
                 "endzones",
-                "R"
+                "R",
+                "T",
+                "P"
               )
   )
 
@@ -45,33 +47,17 @@ eek$methods(filter = function(n = 1, lo = 1/40, hi = 1/2){
   dat$Filter <<- signal::filtfilt(bf, dat$ECG)
 })
 
-eek$methods(smooth = function(l = 65, sd = .25){
-
-  "Smooth ECG signal convolving with Gaussian window."
-
-  if(is.null(dat$Filter)) stop("Call eek$filter() before zoning.")
-
-  # Convole the Gaussian window
-  gw <- signal::gausswin(l, w = 1/sd)
-  gw <- gw / sum(gw)
-  smoothed <- stats::convolve(dat$Filter, gw, type = "open")
-
-  # Align convolution with raw data
-  offset <- (l - 1) / 2
-  subset <- (1 + offset):(length(dat$Filter) + offset)
-  dat$Gaus <<- smoothed[subset]
-})
-
 eek$methods(getR = function(minheight = .5, maxrate = 300){
 
   if(is.null(dat$Filter)) stop("Call eek$filter() before peak finding.")
 
-  # Index putative R peaks
+  # Calculate minpeakdistance from maxrate
   totaltime <- floor(max(dat$Time)) - min(dat$Time)
   totalstep <- which.max(dat$Time >= floor(max(dat$Time)))
   persec <- totalstep / totaltime
   peakd <- ceiling(60 / maxrate * persec)
 
+  # Find putative R peaks
   peaks <- pracma::findpeaks(
     x = dat$Filter,
     minpeakheight = minheight,
@@ -99,6 +85,85 @@ eek$methods(getR = function(minheight = .5, maxrate = 300){
   final <- data.frame(peaks[peakind, c(3, 2, 4, 1)], quality^4)
   colnames(final) <- c("start", "peak", "end", "height", "quality")
   R <<- final
+})
+
+eek$methods(getPT = function(minheight = 0, maxrate = 300){
+
+  if(!is.data.frame(R)) stop("Call eek$getR() before baseline correction.")
+
+  # Calculate minpeakdistance from maxrate
+  totaltime <- floor(max(dat$Time)) - min(dat$Time)
+  totalstep <- which.max(dat$Time >= floor(max(dat$Time)))
+  persec <- totalstep / totaltime
+  peakd <- ceiling(60 / maxrate * persec)
+
+  # Prepare output containers
+  t.peaks <- vector("list", nrow(R)-1)
+  p.peaks <- vector("list", nrow(R)-1)
+
+  # Divide ECG into a series of R-R windows
+  for(i in 1:(nrow(R) - 1)){
+
+    Rstart <- R[i, "peak"]
+    Rend <- R[i+1, "peak"]
+
+    # Find putative PT peaks
+    peaks <- pracma::findpeaks(
+      x = dat$Filter[Rstart:Rend],
+      minpeakheight = minheight,
+      minpeakdistance = peakd
+    )
+
+    # Shift peak locations based on R start
+    peaks[, c(2, 3, 4)] <- Rstart + peaks[, c(2, 3, 4)] - 1
+
+    # Make sure T-wave is always index 1
+    if(peaks[2, 3] < peaks[1, 3]){ # If T-wave is SECOND...
+
+      peaks[c(1, 2), ] <- peaks[c(2, 1), ]
+    }
+
+    # Call first peak "T" and assign quality score
+    df <- as.data.frame(t(c(peaks[1, c(3, 2, 4, 1)], R[i, "quality"])))
+    colnames(df) <- c("start", "peak", "end", "height", "quality")
+    rownames(df) <- NULL
+    t.peaks[[i]] <- df
+
+    # Call last peak "P" and assign quality score
+    df <- as.data.frame(t(c(peaks[2, c(3, 2, 4, 1)], R[i+1, "quality"])))
+    colnames(df) <- c("start", "peak", "end", "height", "quality")
+    rownames(df) <- NULL
+    p.peaks[[i]] <- df
+  }
+
+  # Save peak data in single data.frame
+  T <<- do.call("rbind", t.peaks)
+  P <<- do.call("rbind", p.peaks)
+})
+
+eek$methods(getQS = function(minheight = 0, maxrate = 300){
+
+  # PLACEHOLDER
+})
+
+###
+# Importance values
+
+eek$methods(smooth = function(l = 65, sd = .25){
+
+  "Smooth ECG signal convolving with Gaussian window."
+
+  if(is.null(dat$Filter)) stop("Call eek$filter() before zoning.")
+
+  # Convole the Gaussian window
+  gw <- signal::gausswin(l, w = 1/sd)
+  gw <- gw / sum(gw)
+  smoothed <- stats::convolve(dat$Filter, gw, type = "open")
+
+  # Align convolution with raw data
+  offset <- (l - 1) / 2
+  subset <- (1 + offset):(length(dat$Filter) + offset)
+  dat$Gaus <<- smoothed[subset]
 })
 
 eek$methods(importance = function(threshold){
@@ -156,6 +221,24 @@ eek$methods(qplot = function(view){
   if(!is.null(dat$Gaus)){
 
     points(dat$Time[view], dat$Gaus[view], col = "green", type = "l")
+  }
+
+  if(is.data.frame(P)){
+
+    range <- P$peak %in% view
+    points(dat$Time[P$peak[range]], P$height[range], col = "red")
+  }
+
+  if(is.data.frame(R)){
+
+    range <- R$peak %in% view
+    points(dat$Time[R$peak[range]], R$height[range], col = "red")
+  }
+
+  if(is.data.frame(T)){
+
+    range <- R$peak %in% view
+    points(dat$Time[T$peak[range]], T$height[range], col = "red")
   }
 
   # if(is.numeric(bounds)){
