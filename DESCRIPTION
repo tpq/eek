@@ -14,5 +14,6 @@ RoxygenNote: 5.0.1
 Depends:
     R (>= 3.2.2)
 Suggests:
+    dplyr,
     knitr,
     rmarkdown
