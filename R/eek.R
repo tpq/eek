@@ -1,23 +1,32 @@
 #' A Reference Class to represent a bank account.
 #'
-#' @field balance A length-one numeric vector.
+#' @field dat The ECG signal data.
+#' @field window Default ECG window when not provided.
+#' @field P,Q,R,S,T Peak locations and detection quality.
+#' @field bounds Not yet in use.
+#' @field startzones Not yet in use.
+#' @field endzones Not yet in use.
+#'
+#' @export
 eek <-
   setRefClass("eek",
               fields = c(
                 "dat",
                 "window",
+                "P",
+                "Q",
+                "R",
+                "S",
+                "T",
                 "bounds",
                 "startzones",
-                "endzones",
-                "R",
-                "T",
-                "P"
+                "endzones"
               )
   )
 
 eek$methods(initialize = function(file, channel = 1){
 
-  "Initialize eek object with a single ECG channel."
+  "Initialize eek object using a single ECG channel."
 
   # Read ECG file and select i-th channel
   data <- read.delim(file, skip = 1, header = TRUE,
@@ -48,6 +57,8 @@ eek$methods(filter = function(n = 1, lo = 1/40, hi = 1/2){
 })
 
 eek$methods(getR = function(minheight = .5, maxrate = 300){
+
+  "Locate all R peaks and assign quality score."
 
   if(is.null(dat$Filter)) stop("Call eek$filter() before peak finding.")
 
@@ -88,6 +99,8 @@ eek$methods(getR = function(minheight = .5, maxrate = 300){
 })
 
 eek$methods(getPT = function(minheight = 0, maxrate = 300){
+
+  "Locate all P and T peaks and assign quality score."
 
   if(!is.data.frame(R)) stop("Call eek$getR() before baseline correction.")
 
@@ -141,17 +154,14 @@ eek$methods(getPT = function(minheight = 0, maxrate = 300){
   P <<- do.call("rbind", p.peaks)
 })
 
-eek$methods(getQS = function(minheight = 0, maxrate = 300){
-
-  # PLACEHOLDER
-})
-
-###
-# Importance values
+# eek$methods(getQS = function(minheight = 0, maxrate = 300){
+#
+#   # PLACEHOLDER
+# })
 
 eek$methods(smooth = function(l = 65, sd = .25){
 
-  "Smooth ECG signal convolving with Gaussian window."
+  "Smooth ECG signal by convolving with Gaussian window."
 
   if(is.null(dat$Filter)) stop("Call eek$filter() before zoning.")
 
@@ -166,44 +176,46 @@ eek$methods(smooth = function(l = 65, sd = .25){
   dat$Gaus <<- smoothed[subset]
 })
 
-eek$methods(importance = function(threshold){
-
-  # if(!is.data.frame(R)) stop("Call eek$getR() before baseline correction.")
-  #
-  # function(){
-  #
-  #   # Find importance zones (area between bounds)
-  #   startzones <<- vector("numeric")
-  #   endzones <<- vector("numeric")
-  #   s <- 1
-  #   i <- 1
-  #   for(e in bounds){
-  #
-  #     # First: Make sure zero-crossings flank an extrema
-  #     if(any(res$minindex[, 1] %in% s:e) | any(res$maxindex[, 1] %in% s:e)){
-  #
-  #       startzones[i] <<- s
-  #       endzones[i] <<- e
-  #       i <- i + 1
-  #     }
-  #
-  #     s <- e + 1
-  #   }
-  # }
-  #
-  # if(!is.numeric(bounds)){
-  #
-  #   # Find all of the zero-crossings
-  #   res <- EMD::extrema(dat$Gaus)
-  #   bounds <<- res$cross[, 1]
-  # }
-
-  # For each (R-R) window:
-  #  Calculate Importance Zones
-  #  Threshold: x%
-})
+# eek$methods(importance = function(threshold){
+#
+#   if(!is.data.frame(R)) stop("Call eek$getR() before baseline correction.")
+#
+#   function(){
+#
+#     # Find importance zones (area between bounds)
+#     startzones <<- vector("numeric")
+#     endzones <<- vector("numeric")
+#     s <- 1
+#     i <- 1
+#     for(e in bounds){
+#
+#       # First: Make sure zero-crossings flank an extrema
+#       if(any(res$minindex[, 1] %in% s:e) | any(res$maxindex[, 1] %in% s:e)){
+#
+#         startzones[i] <<- s
+#         endzones[i] <<- e
+#         i <- i + 1
+#       }
+#
+#       s <- e + 1
+#     }
+#   }
+#
+#   if(!is.numeric(bounds)){
+#
+#     # Find all of the zero-crossings
+#     res <- EMD::extrema(dat$Gaus)
+#     bounds <<- res$cross[, 1]
+#   }
+#
+#   # For each (R-R) window:
+#   #  Calculate Importance Zones
+#   #  Threshold: x%
+# })
 
 eek$methods(qplot = function(view){
+
+  "Visualize an ECG window including peak locations."
 
   if(missing(view)){
 
@@ -263,4 +275,34 @@ eek$methods(qplot = function(view){
   #             density = 5)
   #   }
   # }
+})
+
+eek$methods(export = function(file = paste0(getwd(), "/eek-peaks.txt")){
+
+  "Export ECG annotations including peak locations."
+
+  if(!is.data.frame(P) &
+     !is.data.frame(R) &
+     !is.data.frame(T)){
+
+    stop("Call eek$getR() and eek$getPT() before exporting.")
+  }
+
+  # Combine PRT peak locations
+  out <- do.call("rbind",
+                 list(data.frame("ID" = "P", P),
+                      data.frame("ID" = "R", R),
+                      data.frame("ID" = "T", T)
+                 )
+  )
+
+  # Combine time, peak location, and peak label (see: PhysioBank)
+  out <- out[order(out$peak), c("peak", "ID", "quality")]
+  final <- data.frame(dat$Time[out$peak], out)
+
+  # Save output
+  write.table(final, file = file, quote = FALSE, sep = "\t",
+              row.names = FALSE, col.names = FALSE)
+
+  return(TRUE)
 })
