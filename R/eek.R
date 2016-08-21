@@ -3,9 +3,6 @@
 #' @field dat The ECG signal data.
 #' @field window Default ECG window when not provided.
 #' @field P,Q,R,S,T Peak locations and detection quality.
-#' @field bounds Not yet in use.
-#' @field startzones Not yet in use.
-#' @field endzones Not yet in use.
 #'
 #' @export
 eek <-
@@ -17,10 +14,7 @@ eek <-
                 "Q",
                 "R",
                 "S",
-                "T",
-                "bounds",
-                "startzones",
-                "endzones"
+                "T"
               )
   )
 
@@ -227,54 +221,16 @@ eek$methods(smooth = function(l = 65, sd = .25){
   dat$Gaus <<- smoothed[subset]
 })
 
-# eek$methods(importance = function(threshold){
-#
-#   if(!is.data.frame(R)) stop("Call eek$getR() before baseline correction.")
-#
-#   function(){
-#
-#     # Find importance zones (area between bounds)
-#     startzones <<- vector("numeric")
-#     endzones <<- vector("numeric")
-#     s <- 1
-#     i <- 1
-#     for(e in bounds){
-#
-#       # First: Make sure zero-crossings flank an extrema
-#       if(any(res$minindex[, 1] %in% s:e) | any(res$maxindex[, 1] %in% s:e)){
-#
-#         startzones[i] <<- s
-#         endzones[i] <<- e
-#         i <- i + 1
-#       }
-#
-#       s <- e + 1
-#     }
-#   }
-#
-#   if(!is.numeric(bounds)){
-#
-#     # Find all of the zero-crossings
-#     res <- EMD::extrema(dat$Gaus)
-#     bounds <<- res$cross[, 1]
-#   }
-#
-#   # For each (R-R) window:
-#   #  Calculate Importance Zones
-#   #  Threshold: x%
-# })
-
 eek$methods(qplot = function(view){
 
   "Visualize an ECG window including peak locations."
 
-  if(missing(view)){
-
-    view <- window
-  }
+  if(missing(view)) view <- window
 
   plot(dat$Time[view], dat$ECG[view], type = "l",
-       xlab = "Time (sec)", ylab = "ECG (mV)")
+       xlab = "Time (sec)", ylab = "ECG (mV)",
+       ylim = c(min(dat$ECG[view]) - 1,
+                max(dat$ECG[view]) + 1))
 
   if(!is.null(dat$Filter)){
 
@@ -286,58 +242,14 @@ eek$methods(qplot = function(view){
     points(dat$Time[view], dat$Gaus[view], col = "green", type = "l")
   }
 
-  if(is.data.frame(P)){
+  for(wave in list(P, Q, R, S, T)){
 
-    range <- P$peak %in% view
-    points(dat$Time[P$peak[range]], P$height[range], col = "red")
+    if(is.data.frame(wave)){
+
+      range <- wave$peak %in% view
+      points(dat$Time[wave$peak[range]], dat$ECG[wave$peak[range]], col = "red")
+    }
   }
-
-  if(is.data.frame(Q)){
-
-    range <- Q$peak %in% view
-    points(dat$Time[Q$peak[range]], -1 * Q$height[range], col = "red")
-  }
-
-  if(is.data.frame(R)){
-
-    range <- R$peak %in% view
-    points(dat$Time[R$peak[range]], R$height[range], col = "red")
-  }
-
-  if(is.data.frame(S)){
-
-    range <- S$peak %in% view
-    points(dat$Time[S$peak[range]], -1 * S$height[range], col = "red")
-  }
-
-  if(is.data.frame(T)){
-
-    range <- R$peak %in% view
-    points(dat$Time[T$peak[range]], T$height[range], col = "red")
-  }
-
-  # if(is.numeric(bounds)){
-  #
-  #   for(mark in bounds[bounds > min(view) & bounds < max(view)]){
-  #
-  #     abline(v = dat$Time[mark], col = "pink")
-  #   }
-  # }
-  #
-  # if(is.numeric(startzones) & is.numeric(endzones)){
-  #
-  #   range <- startzones >= min(view) & endzones <= max(view)
-  #   st <- startzones[range]
-  #   en <- endzones[range]
-  #   for(i in 1:length(st)){
-  #
-  #     polygon(x = c(rep(dat$Time[st[i]], 2),
-  #                   rep(dat$Time[en[i]], 2)),
-  #             y = c(-100, 100, 100, -100),
-  #             col = "pink", angle = 0,
-  #             density = 5)
-  #   }
-  # }
 })
 
 eek$methods(export = function(file = paste0(getwd(), "/eek-peaks.txt")){

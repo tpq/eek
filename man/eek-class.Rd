@@ -16,12 +16,6 @@ A Reference Class to represent a bank account.
 \item{\code{window}}{Default ECG window when not provided.}
 
 \item{\code{P,Q,R,S,T}}{Peak locations and detection quality.}
-
-\item{\code{bounds}}{Not yet in use.}
-
-\item{\code{startzones}}{Not yet in use.}
-
-\item{\code{endzones}}{Not yet in use.}
 }}
 \section{Methods}{
 
@@ -32,6 +26,8 @@ Class.  No effect on the object itself.}
 \item{\code{filter(n = 1, lo = 1/40, hi = 1/2)}}{Filter ECG signal using a bandpass filter.}
 
 \item{\code{getPT(minheight = 0, maxrate = 300)}}{Locate all P and T peaks and assign quality score.}
+
+\item{\code{getQS(minheight = 0, maxrate = 300)}}{Locate all Q and S peaks and assign quality score.}
 
 \item{\code{getR(minheight = 0.5, maxrate = 300)}}{Locate all R peaks and assign quality score.}
 
