@@ -108,7 +108,7 @@ eek$methods(getPT = function(minheight = 0, maxrate = 300){
   totaltime <- floor(max(dat$Time)) - min(dat$Time)
   totalstep <- which.max(dat$Time >= floor(max(dat$Time)))
   persec <- totalstep / totaltime
-  peakd <- ceiling(60 / maxrate * persec)
+  peakd <- ceiling(60 / (maxrate*2) * persec)
 
   # Prepare output containers
   t.peaks <- vector("list", nrow(R)-1)
@@ -154,10 +154,61 @@ eek$methods(getPT = function(minheight = 0, maxrate = 300){
   P <<- do.call("rbind", p.peaks)
 })
 
-# eek$methods(getQS = function(minheight = 0, maxrate = 300){
-#
-#   # PLACEHOLDER
-# })
+eek$methods(getQS = function(minheight = 0, maxrate = 300){
+
+  "Locate all Q and S peaks and assign quality score."
+
+  if(!is.data.frame(R)) stop("Call eek$getR() before baseline correction.")
+
+  # Calculate minpeakdistance from maxrate
+  totaltime <- floor(max(dat$Time)) - min(dat$Time)
+  totalstep <- which.max(dat$Time >= floor(max(dat$Time)))
+  persec <- totalstep / totaltime
+  peakd <- ceiling(60 / (maxrate*2) * persec)
+
+  # Prepare output containers
+  s.peaks <- vector("list", nrow(R)-1)
+  q.peaks <- vector("list", nrow(R)-1)
+
+  # Divide ECG into a series of R-R windows
+  for(i in 1:(nrow(R) - 1)){
+
+    Rstart <- R[i, "peak"]
+    Rend <- R[i+1, "peak"]
+
+    # Find putative QS peaks
+    peaks <- pracma::findpeaks(
+      x = -1 * dat$Filter[Rstart:Rend],
+      minpeakheight = minheight,
+      minpeakdistance = peakd
+    )
+
+    # Shift peak locations based on R start
+    peaks[, c(2, 3, 4)] <- Rstart + peaks[, c(2, 3, 4)] - 1
+
+    # Make sure S-wave is always index 1
+    if(peaks[2, 3] < peaks[1, 3]){ # If S-wave is SECOND...
+
+      peaks[c(1, 2), ] <- peaks[c(2, 1), ]
+    }
+
+    # Call first peak "S" and assign quality score
+    df <- as.data.frame(t(c(peaks[1, c(3, 2, 4, 1)], R[i, "quality"])))
+    colnames(df) <- c("start", "peak", "end", "height", "quality")
+    rownames(df) <- NULL
+    s.peaks[[i]] <- df
+
+    # Call last peak "Q" and assign quality score
+    df <- as.data.frame(t(c(peaks[2, c(3, 2, 4, 1)], R[i+1, "quality"])))
+    colnames(df) <- c("start", "peak", "end", "height", "quality")
+    rownames(df) <- NULL
+    q.peaks[[i]] <- df
+  }
+
+  # Save peak data in single data.frame
+  S <<- do.call("rbind", s.peaks)
+  Q <<- do.call("rbind", q.peaks)
+})
 
 eek$methods(smooth = function(l = 65, sd = .25){
 
@@ -241,10 +292,22 @@ eek$methods(qplot = function(view){
     points(dat$Time[P$peak[range]], P$height[range], col = "red")
   }
 
+  if(is.data.frame(Q)){
+
+    range <- Q$peak %in% view
+    points(dat$Time[Q$peak[range]], -1 * Q$height[range], col = "red")
+  }
+
   if(is.data.frame(R)){
 
     range <- R$peak %in% view
     points(dat$Time[R$peak[range]], R$height[range], col = "red")
+  }
+
+  if(is.data.frame(S)){
+
+    range <- S$peak %in% view
+    points(dat$Time[S$peak[range]], -1 * S$height[range], col = "red")
   }
 
   if(is.data.frame(T)){
