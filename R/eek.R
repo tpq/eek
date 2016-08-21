@@ -256,20 +256,14 @@ eek$methods(export = function(file = paste0(getwd(), "/eek-peaks.txt")){
 
   "Export ECG annotations including peak locations."
 
-  if(!is.data.frame(P) &
-     !is.data.frame(R) &
-     !is.data.frame(T)){
+  # Combine P, Q, R, S, and T peak data
+  cleaned <- lapply(list("P", "Q", "R", "S", "T"),
+                    function(wave){
 
-    stop("Call eek$getR() and eek$getPT() before exporting.")
-  }
-
-  # Combine PRT peak locations
-  out <- do.call("rbind",
-                 list(data.frame("ID" = "P", P),
-                      data.frame("ID" = "R", R),
-                      data.frame("ID" = "T", T)
-                 )
-  )
+                      tryCatch(data.frame("ID" = wave, get(wave)),
+                               error = function(e) data.frame())
+                    })
+  out <- do.call("rbind", cleaned)
 
   # Combine time, peak location, and peak label (see: PhysioBank)
   out <- out[order(out$peak), c("peak", "ID", "quality")]
