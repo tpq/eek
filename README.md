@@ -46,7 +46,7 @@ ekg$qplot(1:1000)
 
 ### Peak detection
 
-This package includes simple methods for detecting peaks in ECGs that exhibit normal (i.e., sinus) rhythm. These methods will almost undoubtedly fail if applied to abnormal ECGs. To detect peaks, we first locate all R peaks using the `$getR` method. This saves the resultant peak locations, bounds, and *detection quality* in the `$R` data slot. As defined, this quality score is reduced by each additional large peak present since the previous R peak until the next. This quality score also applies to the P and T waves associated with that R wave.
+This package includes simple methods for detecting peaks in ECGs that exhibit normal (i.e., sinus) rhythm. These methods will almost undoubtedly fail if applied to abnormal ECGs. To detect peaks, we first locate all R peaks using the `$getR` method. This saves the resultant peak locations, bounds, and *detection quality* in the `$R` data slot. As defined, this quality score is reduced by each additional large peak present since the previous R peak until the next. This quality score also applies to the P, Q, S and T waves associated with that R wave.
 
 ``` r
 ekg$getR()
@@ -65,40 +65,25 @@ Likewise, we can locate all P and T peaks using the `$getPT` method. Again, the 
 
 ``` r
 ekg$getPT()
-head(ekg$P)
 ```
 
-    ##   start peak  end     height quality
-    ## 1   427  431  435 0.06273638       1
-    ## 2   658  666  697 0.05162004       1
-    ## 3   905  908  914 0.05805887       1
-    ## 4  1141 1150 1157 0.06085847       1
-    ## 5  1370 1373 1379 0.06149926       1
-    ## 6  1584 1593 1602 0.05779833       1
+Finally, we locate all Q and S peaks using the `$getQS` method. Again, the resultant peak locations, bounds, and *detection quality* is saved in the `$Q` and `$S` data slots, respectively.
 
 ``` r
-head(ekg$T)
+ekg$getQS()
 ```
 
-    ##   start peak  end    height quality
-    ## 1   223  287  303 0.1512375       0
-    ## 2   512  538  558 0.1373154       1
-    ## 3   753  775  791 0.1494315       1
-    ## 4   953 1014 1031 0.1563319       1
-    ## 5  1238 1258 1277 0.1579331       1
-    ## 6  1419 1481 1498 0.1450401       1
-
-These peaks will now appear as marked when plotting an ECG window. Take note that the "start" and "end" columns do **not** refer to the bounds of the P, R, or T waves, but rather the procedurally-detected peaks.
+These peaks will now appear as marked when plotting an ECG window. Take note that the "start" and "end" columns do **not** refer to the bounds of the P, Q, R, S, or T waves, but rather the bounds of the procedurally-detected peaks.
 
 ``` r
 ekg$qplot(1:1000)
 ```
 
-![](README_files/figure-markdown_github/unnamed-chunk-8-1.png)
+![](README_files/figure-markdown_github/unnamed-chunk-9-1.png)
 
 ### Detection accuracy
 
-Next, we evaluate the accuracy of these simple peak detection methods by comparing our results to expert annotations available for these data. However, since only a portion of each ECG signal has expert annotations, we must first subset our results.
+Next, we evaluate the accuracy of these simple peak detection methods by comparing our results to expert annotations (of the P, R, and T waves) available for these data. However, since only a portion of each ECG signal has expert annotations, we must first subset our results.
 
 ``` r
 annot <- read.delim("data-raw/qtdb/sel16265-q1c.txt", sep = "")
@@ -141,7 +126,6 @@ Since each index represents approximately 4 milliseconds, we can confirm that th
 P.expert <- annot %>% subset(Label == "p", Index)
 ekg$P %>%
   subset(peak %in% annot.window) %>%
-  slice(1:30) %>%
   bind_cols(P.expert) %>%
   transmute(diff = peak - Index) %>%
   summarise(mean(abs(diff)))
@@ -162,7 +146,7 @@ ekg$T %>%
     ##   mean(abs(diff))
     ## 1        2.533333
 
-Last, we overlay the expert-identified peak locations on top of the procedurally-annotated ECG window.
+Last, we overlay the expert-identified peak locations on top of the procedurally-identified ECG window.
 
 ``` r
 ekg$qplot(annot.window[1:1000])
@@ -171,7 +155,7 @@ abline(v = ekg$dat$Time[P.expert$Index], col = "blue")
 abline(v = ekg$dat$Time[T.expert$Index], col = "blue")
 ```
 
-![](README_files/figure-markdown_github/unnamed-chunk-13-1.png)
+![](README_files/figure-markdown_github/unnamed-chunk-14-1.png)
 
 Everything seems to check out.
 

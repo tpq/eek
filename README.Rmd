@@ -43,7 +43,7 @@ ekg$qplot(1:1000)
 
 ### Peak detection
 
-This package includes simple methods for detecting peaks in ECGs that exhibit normal (i.e., sinus) rhythm. These methods will almost undoubtedly fail if applied to abnormal ECGs. To detect peaks, we first locate all R peaks using the `$getR` method. This saves the resultant peak locations, bounds, and *detection quality* in the `$R` data slot. As defined, this quality score is reduced by each additional large peak present since the previous R peak until the next. This quality score also applies to the P and T waves associated with that R wave.
+This package includes simple methods for detecting peaks in ECGs that exhibit normal (i.e., sinus) rhythm. These methods will almost undoubtedly fail if applied to abnormal ECGs. To detect peaks, we first locate all R peaks using the `$getR` method. This saves the resultant peak locations, bounds, and *detection quality* in the `$R` data slot. As defined, this quality score is reduced by each additional large peak present since the previous R peak until the next. This quality score also applies to the P, Q, S and T waves associated with that R wave.
 
 ```{r}
 ekg$getR()
@@ -54,11 +54,15 @@ Likewise, we can locate all P and T peaks using the `$getPT` method. Again, the 
 
 ```{r}
 ekg$getPT()
-head(ekg$P)
-head(ekg$T)
 ```
 
-These peaks will now appear as marked when plotting an ECG window. Take note that the "start" and "end" columns do **not** refer to the bounds of the P, R, or T waves, but rather the procedurally-detected peaks.
+Finally, we locate all Q and S peaks using the `$getQS` method. Again, the resultant peak locations, bounds, and *detection quality* is saved in the `$Q` and `$S` data slots, respectively.
+
+```{r}
+ekg$getQS()
+```
+
+These peaks will now appear as marked when plotting an ECG window. Take note that the "start" and "end" columns do **not** refer to the bounds of the P, Q, R, S, or T waves, but rather the bounds of the procedurally-detected peaks.
 
 ```{r}
 ekg$qplot(1:1000)
@@ -66,7 +70,7 @@ ekg$qplot(1:1000)
 
 ### Detection accuracy
 
-Next, we evaluate the accuracy of these simple peak detection methods by comparing our results to expert annotations available for these data. However, since only a portion of each ECG signal has expert annotations, we must first subset our results.
+Next, we evaluate the accuracy of these simple peak detection methods by comparing our results to expert annotations (of the P, R, and T waves) available for these data. However, since only a portion of each ECG signal has expert annotations, we must first subset our results.
 
 ```{r}
 annot <- read.delim("data-raw/qtdb/sel16265-q1c.txt", sep = "")
@@ -92,7 +96,6 @@ Since each index represents approximately 4 milliseconds, we can confirm that th
 P.expert <- annot %>% subset(Label == "p", Index)
 ekg$P %>%
   subset(peak %in% annot.window) %>%
-  slice(1:30) %>%
   bind_cols(P.expert) %>%
   transmute(diff = peak - Index) %>%
   summarise(mean(abs(diff)))
@@ -107,7 +110,7 @@ ekg$T %>%
   summarise(mean(abs(diff)))
 ```
 
-Last, we overlay the expert-identified peak locations on top of the procedurally-annotated ECG window.
+Last, we overlay the expert-identified peak locations on top of the procedurally-identified ECG window.
 
 ```{r}
 ekg$qplot(annot.window[1:1000])
