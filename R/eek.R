@@ -4,6 +4,7 @@
 #' @field window Default ECG window when not provided.
 #' @field P,Q,R,S,T Peak locations and detection quality.
 #'
+#' @import methods
 #' @export
 eek <-
   setRefClass("eek",
